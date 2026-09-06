@@ -56,7 +56,7 @@ button,input{font:inherit}.app{min-height:100vh;display:flex}.side{width:220px;b
   </div>
   <table class="bill-table">
     <thead><tr><th>No</th><th>Code</th><th>Item</th><th>Price</th><th>Qty</th><th>Amount</th><th>Remove</th></tr></thead>
-    <tbody id="billBody"><tr><td colspan="5" class="empty">No items added</td></tr></tbody>
+    <tbody id="billBody"><tr><td colspan="7" class="empty">No items added</td></tr></tbody>
   </table>
   <div class="summary">
     <div class="sumrow"><span>Sub-Total</span><b id="subtotal">₹0.00</b></div>
@@ -149,8 +149,49 @@ button,input{font:inherit}.app{min-height:100vh;display:flex}.side{width:220px;b
 <div class="field" style="margin-top:10px"><label>Logo</label><input id="setLogo" type="file" accept="image/*" onchange="previewLogo(event)"></div>
 <div class="note">Logo is saved to cloud so it can appear on laptop and mobile.</div>
 <div class="modal-actions"><button class="btn secondary" onclick="closeSettings()">Cancel</button><button class="btn primary" onclick="saveSettings()">Save</button></div>
+<div style="margin-top:18px;padding-top:14px;border-top:1px solid #e5e7eb"><button class="btn" style="width:100%;background:#fee2e2;color:#991b1b" onclick="openResetModal()">Reset / Remove Bills</button></div>
 </div></div>
 
+
+<div id="resetModal" class="modal">
+  <div class="modalbox">
+    <h3>Reset / Remove Bills</h3>
+    <div class="note" style="margin-bottom:12px">Enter the reset password first.</div>
+    <div class="field"><label>Password</label><input id="resetPassword" type="password" autocomplete="off" placeholder="Enter password"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeResetModal()">Cancel</button>
+      <button class="btn primary" onclick="verifyResetPassword()">Continue</button>
+    </div>
+  </div>
+</div>
+
+<div id="resetChoiceModal" class="modal">
+  <div class="modalbox">
+    <h3>Choose Reset Action</h3>
+    <div class="note" style="margin-bottom:14px">Select what you want to remove.</div>
+    <div style="display:grid;gap:10px">
+      <button class="btn primary" onclick="resetAllBills()">Reset All Bills & Stock</button>
+      <button class="btn secondary" onclick="openSelectedBillRemove()">Remove Selected Bill</button>
+    </div>
+    <div class="modal-actions"><button class="btn secondary" onclick="closeResetChoice()">Cancel</button></div>
+  </div>
+</div>
+
+<div id="selectedBillModal" class="modal">
+  <div class="modalbox" style="max-width:900px;width:96%">
+    <h3>Remove Selected Bills</h3>
+    <div class="note" style="margin-bottom:12px">Multiple bills can be selected. Filter by a specific date or month.</div>
+    <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:12px">
+      <div class="field" style="min-width:150px;flex:1"><label>Filter</label><select id="removeBillFilter" onchange="renderRemoveBillList()" style="width:100%;height:43px;border:1px solid #cbd5e1;border-radius:9px;padding:0 10px"><option value="all">All Bills</option><option value="date">Specific Date</option><option value="month">Specific Month</option></select></div>
+      <div id="removeDateWrap" class="field" style="display:none;min-width:170px"><label>Date</label><input id="removeBillDate" type="date" onchange="renderRemoveBillList()"></div>
+      <div id="removeMonthWrap" class="field" style="display:none;min-width:170px"><label>Month</label><input id="removeBillMonth" type="month" onchange="renderRemoveBillList()"></div>
+      <button class="btn secondary" style="height:43px" onclick="toggleAllRemoveBills()">☑ Select All</button>
+    </div>
+    <div id="removeBillSelectionInfo" class="note" style="margin-bottom:8px">0 bills selected</div>
+    <div id="removeBillList" style="max-height:55vh;overflow:auto;border:1px solid #e5e7eb;border-radius:10px"></div>
+    <div class="modal-actions"><button class="btn secondary" onclick="closeSelectedBillModal()">Cancel</button><button class="btn" style="background:#dc2626;color:#fff" onclick="removeSelectedBill()">Delete Selected Bills</button></div>
+  </div>
+</div>
 
 <div id="waModal" class="modal">
   <div class="modalbox">
@@ -184,6 +225,7 @@ const SEED=[
 {code:"1",name:"KURTI",qty:110},{code:"2",name:"UMBRELLA TOP",qty:30},{code:"3",name:"3 p/c SET",qty:30},{code:"4",name:"2 p/c SET",qty:25},{code:"5",name:"SHORT KURTI",qty:40},{code:"6",name:"LEGGINGS",qty:50},{code:"7",name:"DUPPATA",qty:50},{code:"8",name:"PLAZZO PANT",qty:25},{code:"9",name:"WESTERN FROCK",qty:20},{code:"10",name:"ONE PIECE",qty:10}
 ];
 const KEY='superSaleAppV3';
+const RESET_PASSWORD='vino9655@';
 const SUPABASE_URL='https://wmqxugadsyhpvrigbsbu.supabase.co';
 const SUPABASE_KEY='sb_publishable_q2IQHD5D8pSBJfOxqZr_ow_0sHOk98Z';
 const SB_HEADERS={'apikey':SUPABASE_KEY,'Content-Type':'application/json','Accept':'application/json'};
@@ -526,6 +568,42 @@ async function saveSettings(){
  }
  closeSettings();
  renderProfile();
+}
+function openResetModal(){
+ document.getElementById('resetPassword').value='';
+ document.getElementById('resetModal').classList.add('show');
+}
+function closeResetModal(){document.getElementById('resetModal').classList.remove('show')}
+function closeResetChoice(){document.getElementById('resetChoiceModal').classList.remove('show')}
+function verifyResetPassword(){
+ const p=document.getElementById('resetPassword').value;
+ if(p!==RESET_PASSWORD)return toast('Wrong password');
+ closeResetModal();
+ document.getElementById('resetChoiceModal').classList.add('show');
+}
+function openSelectedBillRemove(){ closeResetChoice(); document.getElementById('removeBillFilter').value='all'; document.getElementById('removeBillDate').value=''; document.getElementById('removeBillMonth').value=''; renderRemoveBillList(); document.getElementById('selectedBillModal').classList.add('show'); }
+function getFilteredRemoveBills(){ const mode=document.getElementById('removeBillFilter').value,dateVal=document.getElementById('removeBillDate').value,monthVal=document.getElementById('removeBillMonth').value; let bills=state.history.slice().sort((a,b)=>new Date(b.date)-new Date(a.date)); if(mode==='date'&&dateVal)bills=bills.filter(b=>new Date(b.date).toISOString().slice(0,10)===dateVal); if(mode==='month'&&monthVal)bills=bills.filter(b=>{const d=new Date(b.date);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')===monthVal}); return bills; }
+function renderRemoveBillList(){ const mode=document.getElementById('removeBillFilter').value; document.getElementById('removeDateWrap').style.display=mode==='date'?'block':'none'; document.getElementById('removeMonthWrap').style.display=mode==='month'?'block':'none'; const box=document.getElementById('removeBillList'),selected=new Set(Array.from(document.querySelectorAll('.removeBillCheck:checked')).map(c=>c.value)),bills=getFilteredRemoveBills(); if(!bills.length){box.innerHTML='<div style="padding:20px;text-align:center;color:#64748b">No bills found for this filter.</div>';}else{box.innerHTML=bills.map(b=>{const checked=selected.has(String(b.no))?'checked':''; const items=(b.items||[]).map(it=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed #eee"><span><b>${escapeHtml(it.code)}</b> - ${escapeHtml(it.name||'Item')} × ${Number(it.qty)||0} @ ${money(it.price)}</span><b>${money((Number(it.price)||0)*(Number(it.qty)||0))}</b></div>`).join(''); return `<label style="display:block;padding:13px;border-bottom:1px solid #e5e7eb;cursor:pointer"><div style="display:flex;gap:10px;align-items:flex-start"><input class="removeBillCheck" type="checkbox" value="${escapeHtml(b.no)}" ${checked} style="width:20px;height:20px;margin-top:2px" onchange="updateRemoveSelectionInfo()"><div style="flex:1"><div style="display:flex;justify-content:space-between"><b>Bill No: ${escapeHtml(b.no)}</b><b>${money(b.amount)}</b></div><div style="font-size:13px;color:#64748b;margin:4px 0 8px">${new Date(b.date).toLocaleString()} · Qty: ${Number(b.qty)||0}</div><div style="font-size:13px">${items}</div><div style="text-align:right;font-weight:800;margin-top:8px">Total: ${money(b.amount)}</div></div></div></label>`}).join('');} updateRemoveSelectionInfo(); }
+function updateRemoveSelectionInfo(){const n=document.querySelectorAll('.removeBillCheck:checked').length;document.getElementById('removeBillSelectionInfo').textContent=n+' bill'+(n===1?'':'s')+' selected';}
+function toggleAllRemoveBills(){const c=Array.from(document.querySelectorAll('.removeBillCheck'));if(!c.length)return toast('No bills found');const all=c.every(x=>x.checked);c.forEach(x=>x.checked=!all);updateRemoveSelectionInfo();}
+function closeSelectedBillModal(){document.getElementById('selectedBillModal').classList.remove('show')}
+async function removeSelectedBill(){const checks=Array.from(document.querySelectorAll('.removeBillCheck:checked'));if(!checks.length)return toast('Please tick at least one bill to delete');const nos=checks.map(c=>String(c.value)),bills=state.history.filter(b=>nos.includes(String(b.no)));if(!bills.length)return toast('Selected bills not found');if(!confirm('Delete '+bills.length+' selected bill'+(bills.length===1?'':'s')+'? Stock will be restored.'))return;try{for(const bill of bills){for(const item of (bill.items||[])){const p=state.products.find(x=>String(x.code)===String(item.code));if(p){p.qty+=Number(item.qty)||0;if(cloudReady)await syncProductToCloud(p);}}if(cloudReady&&bill.id){await sbFetch('bill_items?bill_id=eq.'+encodeURIComponent(bill.id),{method:'DELETE',headers:{Prefer:'return=minimal'}});await sbFetch('bills?id=eq.'+encodeURIComponent(bill.id),{method:'DELETE',headers:{Prefer:'return=minimal'}});}}state.history=state.history.filter(b=>!nos.includes(String(b.no)));state.billNo=state.history.length?Math.max(...state.history.map(b=>Number(b.no)||0))+1:1;save();renderAll();renderStock();renderHistory();closeSelectedBillModal();toast(bills.length+' bill'+(bills.length===1?'':'s')+' deleted and stock restored');}catch(e){console.error(e);toast('Delete failed: '+(e.message||e));}}
+async function resetAllBills(){
+ if(!state.history.length)return toast('No bills to reset');
+ if(!confirm('Reset ALL bills? All bill history will be removed and stock restored.'))return;
+ try{
+  if(cloudReady){
+   const items=await sbFetch('bill_items?select=id,bill_id,product_code,qty');
+   const add={};items.forEach(it=>{const c=String(it.product_code);add[c]=(add[c]||0)+(Number(it.qty)||0);});
+   for(const p of state.products){const n=add[String(p.code)]||0;if(n){p.qty+=n;await syncProductToCloud(p);}}
+   await sbFetch('bill_items?id=gt.0',{method:'DELETE',headers:{Prefer:'return=minimal'}});
+   await sbFetch('bills?id=gt.0',{method:'DELETE',headers:{Prefer:'return=minimal'}});
+  }else{
+   state.history.forEach(b=>b.items.forEach(item=>{const p=state.products.find(x=>String(x.code)===String(item.code));if(p)p.qty+=Number(item.qty)||0;}));
+  }
+  state.history=[];state.bill=[];state.billNo=1;state.pay='Cash';
+  save();renderAll();renderStock();renderHistory();closeResetChoice();toast('All test bills reset. Ready for new billing');
+ }catch(e){console.error(e);toast('Reset failed: '+(e.message||e));}
 }
 function renderAll(){document.getElementById('billDate').textContent=new Date().toLocaleDateString();document.getElementById('billNo').textContent=state.billNo;renderCategories();renderBill();renderProfile()}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
